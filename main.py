@@ -785,6 +785,28 @@ LAUNCHPAD_BUY_OPS = {
     "a5a7cbf8",
 }
 
+# Best-effort Groypad watch-address map.
+# Important: launchpad buys often hit a router/launchpad contract, not the jetton master itself,
+# so polling the token master account can miss them entirely. When we know the launchpad contract
+# from a sample tx, we watch that contract instead.
+GROYPAD_WATCH_BY_TOKEN = {
+    # IGOR sample supplied by user on 2026-03-30
+    "EQAOQNg9yr0xNNR45Ebm3Sa2f3Wo5-blxlUGKZhI_b2OLF5d": "0:71f1326c1bd3a07e938982e54711ed2ce56b38d1304ce432340f2bc3a404f6a1",
+}
+
+def launchpad_watch_address(token: Dict[str, Any]) -> str:
+    if not isinstance(token, dict):
+        return ""
+    explicit = str(token.get("launchpad_watch") or token.get("watch_address") or "").strip()
+    if explicit:
+        return explicit
+    addr = str(token.get("address") or "").strip()
+    if str(token.get("launchpad") or "").lower() == "groypad":
+        mapped = GROYPAD_WATCH_BY_TOKEN.get(addr)
+        if mapped:
+            return mapped
+    return addr
+
 
 def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> List[Dict[str, Any]]:
     """Raw TonAPI blockchain transaction fallback for bonding / launchpad buys.
@@ -1428,7 +1450,8 @@ async def warmup_seen_for_chat(chat_id: int, ston_pool: str|None, dedust_pool: s
             tok0 = g0.get("token") if isinstance(g0, dict) else None
             if isinstance(tok0, dict) and bool(tok0.get("blum_mode")) and tok0.get("address"):
                 total_ton = 0.0
-                evs = await _to_thread(tonapi_account_events, tok0.get("address"), BLUM_EVENT_LIMIT)
+                watch_addr0 = launchpad_watch_address(tok0)
+                evs = await _to_thread(tonapi_account_events, watch_addr0, BLUM_EVENT_LIMIT)
                 if isinstance(evs, list) and evs:
                     newest = evs[0]
                     newest_blum_eid = str(newest.get("event_id") or newest.get("id") or "").strip() or None
@@ -1443,7 +1466,7 @@ async def warmup_seen_for_chat(chat_id: int, ston_pool: str|None, dedust_pool: s
                                 total_ton += max(0.0, float(b.get("ton") or 0.0))
                             except Exception:
                                 pass
-                txs = await _to_thread(tonapi_account_transactions, tok0.get("address"), BLUM_TX_LIMIT)
+                txs = await _to_thread(tonapi_account_transactions, watch_addr0, BLUM_TX_LIMIT)
                 if isinstance(txs, list) and txs:
                     newest_tx0 = txs[0]
                     newest_blum_tx = str(_tx_hash(newest_tx0) or "").strip() or None
@@ -2639,6 +2662,7 @@ async def addtoken_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "dedust_pool": dedust_pool,
         "blum_mode": bool((not ston_pool) and (not dedust_pool)),
         "launchpad": ("groypad" if (not ston_pool and not dedust_pool) else ""),
+        "launchpad_watch": (GROYPAD_WATCH_BY_TOKEN.get(jetton, "") if (not ston_pool and not dedust_pool) else ""),
         "blum_cap_ton": float(BLUM_BONDING_CAP_TON),
         "blum_progress_ton": 0.0,
         "blum_progress_pct": 0.0,
@@ -4093,6 +4117,7 @@ async def _set_token_now(chat_id: int, jetton: str, context: ContextTypes.DEFAUL
         "dedust_pool": dedust_pool,
         "blum_mode": bool((not ston_pool) and (not dedust_pool)),
         "launchpad": ("groypad" if (not ston_pool and not dedust_pool) else ""),
+        "launchpad_watch": (GROYPAD_WATCH_BY_TOKEN.get(jetton, "") if (not ston_pool and not dedust_pool) else ""),
         "blum_cap_ton": float(BLUM_BONDING_CAP_TON),
         "blum_progress_ton": 0.0,
         "blum_progress_pct": 0.0,
@@ -4521,7 +4546,8 @@ async def poll_once(app: Application):
                 ignore_before = int(token.get("ignore_before_ts") or 0)
 
                 # 1) TonAPI events pass
-                evs = await _to_thread(tonapi_account_events, token["address"], BLUM_EVENT_LIMIT)
+                watch_addr = launchpad_watch_address(token)
+                evs = await _to_thread(tonapi_account_events, watch_addr, BLUM_EVENT_LIMIT)
                 if isinstance(evs, list) and evs:
                     last_eid = str(token.get("last_blum_event_id") or "").strip()
                     try:
@@ -4584,7 +4610,7 @@ async def poll_once(app: Application):
                             token["last_blum_event_ts"] = ts_new
 
                 # 2) Raw tx fallback for bonding buys like the supplied sample tx
-                txs = await _to_thread(tonapi_account_transactions, token["address"], BLUM_TX_LIMIT)
+                txs = await _to_thread(tonapi_account_transactions, watch_addr, BLUM_TX_LIMIT)
                 if isinstance(txs, list) and txs:
                     last_tx = str(token.get("last_blum_tx") or "").strip()
                     last_lt = str(token.get("last_blum_lt") or "").strip()
