@@ -27,9 +27,9 @@ TONAPI_BASE = os.getenv("TONAPI_BASE", "https://tonapi.io").strip().rstrip("/")
 POLL_INTERVAL = max(0.75, float(os.getenv("POLL_INTERVAL", "0.75")))
 BURST_WINDOW_SEC = int(os.getenv("BURST_WINDOW_SEC", "30"))
 DTRADE_REF = os.getenv("DTRADE_REF", "https://t.me/dtrade?start=11TYq7LInG").strip()
-TRENDING_URL = os.getenv("TRENDING_URL", "https://t.me/SpyTonTrending").strip()
-DEFAULT_TOKEN_TG = os.getenv("DEFAULT_TOKEN_TG", "https://t.me/SpyTonEco").strip()
-LISTING_URL = os.getenv("LISTING_URL", "https://t.me/SpyTONListing").strip()
+TRENDING_URL = os.getenv("TRENDING_URL", "https://t.me/KYRONTrending").strip()
+DEFAULT_TOKEN_TG = os.getenv("DEFAULT_TOKEN_TG", "https://t.me/KYRONEco").strip()
+LISTING_URL = os.getenv("LISTING_URL", "https://t.me/KYRONListing").strip()
 
 DATA_DIR = os.getenv("DATA_DIR", "").strip()
 def _data_path(p: str) -> str:
@@ -52,8 +52,8 @@ LEADERBOARD_WINDOW_HOURS = max(1, int(float(os.getenv("LEADERBOARD_WINDOW_HOURS"
 LEADERBOARD_COMPARE_WINDOW_HOURS = max(1, int(float(os.getenv("LEADERBOARD_COMPARE_WINDOW_HOURS", str(LEADERBOARD_WINDOW_HOURS)))))
 LEADERBOARD_STATS_FILE = _data_path(os.getenv("LEADERBOARD_STATS_FILE", "leaderboard_stats.json"))
 LEADERBOARD_MSG_FILE = _data_path(os.getenv("LEADERBOARD_MSG_FILE", "leaderboard_msg.json"))
-BOOK_TRENDING_URL = os.getenv("BOOK_TRENDING_URL", "https://t.me/SpyTONTrndBot").strip()
-LEADERBOARD_HEADER_HANDLE = os.getenv("LEADERBOARD_HEADER_HANDLE", "@Spytontrending").strip()
+BOOK_TRENDING_URL = os.getenv("BOOK_TRENDING_URL", "https://t.me/KYRONTrndBot").strip()
+LEADERBOARD_HEADER_HANDLE = os.getenv("LEADERBOARD_HEADER_HANDLE", "@KYRONTrending").strip()
 LEADERBOARD_MESSAGE_ID_STR = os.getenv("LEADERBOARD_MESSAGE_ID", "").strip()  # e.g. 25145
 LEADERBOARD_CHAT_ID_STR = os.getenv("LEADERBOARD_CHAT_ID", "").strip()  # optional; defaults to TRENDING_POST_CHAT_ID
 
@@ -631,14 +631,14 @@ I18N: Dict[str, Dict[str, str]] = {
     "lang_title": "Choose language / Выберите язык",
     "lang_en": "🇬🇧 English",
     "lang_ru": "🇷🇺 Russian",
-    "start_title": "🚀 *SpyTON BuyBot*",
+    "start_title": "🚀 *KYRON BuyBot*",
     "start_desc": "Premium buy alerts for STON.fi + DeDust (TON).\n\n• Add to a group\n• Configure token in 10 seconds\n• Clean buy posts + ads support\n\nUse the buttons below:",
-    "connected_title": "✅ *SpyTON BuyBot connected*",
+    "connected_title": "✅ *KYRON BuyBot connected*",
     "connected_desc": "Now send the token CA here in DM.\nI will auto-detect *STON.fi* / *DeDust* pools and start posting buys in your group.\n\nTip: you can also include the token Telegram link in the same message.\nExample:\n`<CA> https://t.me/YourToken`",
     "lang_set_ok": "Language saved: English ✅",
     "lang_set_ok_ru": "Language saved: Russian ✅",
     "need_admin": "Admins only.",
-    "wiz_paste_title": "🛰 SpyTON Setup — Paste Token CA",
+    "wiz_paste_title": "🛰 KYRON Setup — Paste Token CA",
     "wiz_paste_hint": "STON.fi / DeDust will be auto-detected.",
     "wiz_found_title": "🔎 Token found",
     "wiz_confirm": "✅ Confirm",
@@ -659,14 +659,14 @@ I18N: Dict[str, Dict[str, str]] = {
     "lang_title": "Выберите язык / Choose language",
     "lang_en": "🇬🇧 English",
     "lang_ru": "🇷🇺 Русский",
-    "start_title": "🚀 *SpyTON BuyBot*",
+    "start_title": "🚀 *KYRON BuyBot*",
     "start_desc": "Премиум-уведомления о покупках для STON.fi + DeDust (TON).\n\n• Добавьте в группу\n• Настройте токен за 10 секунд\n• Чистые buy-посты + поддержка рекламы\n\nИспользуйте кнопки ниже:",
-    "connected_title": "✅ *SpyTON BuyBot подключён*",
+    "connected_title": "✅ *KYRON BuyBot подключён*",
     "connected_desc": "Теперь отправьте сюда в ЛС адрес токена (CA).\nЯ автоматически найду пулы *STON.fi* / *DeDust* и начну постить покупки в вашей группе.\n\nСовет: можно добавить ссылку на Telegram токена в том же сообщении.\nПример:\n`<CA> https://t.me/YourToken`",
     "lang_set_ok": "Язык сохранён: English ✅",
     "lang_set_ok_ru": "Язык сохранён: Русский ✅",
     "need_admin": "Только для админов.",
-    "wiz_paste_title": "🛰 Настройка SpyTON — отправьте CA",
+    "wiz_paste_title": "🛰 Настройка KYRON — отправьте CA",
     "wiz_paste_hint": "Пулы STON.fi / DeDust будут найдены автоматически.",
     "wiz_found_title": "🔎 Токен найден",
     "wiz_confirm": "✅ Подтвердить",
@@ -1357,7 +1357,7 @@ def ton_usd_price() -> Optional[float]:
             "https://api.coingecko.com/api/v3/simple/price",
             params={"ids": "the-open-network", "vs_currencies": "usd"},
             timeout=10,
-            headers={"accept": "application/json", "user-agent": "SpyTONBuyBot/1.0"},
+            headers={"accept": "application/json", "user-agent": "KYRONBuyBot/1.0"},
         )
         if r.status_code == 200:
             js = r.json()
@@ -1402,7 +1402,7 @@ def gecko_get(path: str, params: Optional[dict] = None) -> Optional[dict]:
             params=params or {},
             headers={
                 "accept": "application/json",
-                "user-agent": "SpyTONBuyBot/1.0",
+                "user-agent": "KYRONBuyBot/1.0",
             },
             timeout=12,
         )
@@ -1857,7 +1857,7 @@ def _preview_key(chat_id: int, user_id: int) -> str:
 def _spyton_home_text() -> str:
     return (
         "*SPYTON*\n\n"
-        "[SpyTON Community](https://t.me/SpyTonCommunity) | TON buy tracker for fast-moving tokens\n\n"
+        "[KYRON Community](https://t.me/KYRONCommunity) | TON buy tracker for fast-moving tokens\n\n"
         "Track your TON token with a cleaner setup flow.\n"
         "Configure buys, links, emoji and media from one simple panel."
     )
@@ -1948,7 +1948,7 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("➕ Add BuyBot to Group", url=add_url)],
         ])
         await update.message.reply_text(
-            "*SpyTON BuyBot*\n\n"
+            "*KYRON BuyBot*\n\n"
             "Track TON token buys directly in your group with fast setup and easy controls.\n\n"
             "No private DM setup is needed.\n"
             "Everything is managed inside your group.\n\n"
@@ -2086,7 +2086,7 @@ async def addtoken_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Usage:\n"
             "/addtoken <TOKEN_CA or pool/link> [SYMBOL] [https://t.me/YourToken]\n\n"
             "Example:\n"
-            "/addtoken EQ... TFT https://t.me/SpyTonTrending"
+            "/addtoken EQ... TFT https://t.me/KYRONTrending"
         )
         return
 
@@ -2364,7 +2364,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "EDIT_LINK":
         AWAITING_EDIT_INPUT[user.id] = {"chat_id": chat.id, "field": "telegram"}
-        await q.message.reply_text("👇 Send your group/portal link (e.g., https://t.me/SpyTonCommunity)")
+        await q.message.reply_text("👇 Send your group/portal link (e.g., https://t.me/KYRONCommunity)")
         return
 
     if data == "EDIT_EMOJI":
@@ -2407,7 +2407,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_url = await build_add_to_group_url(context.application)
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("➕ Add BuyBot to Group", url=add_url)]])
         await q.edit_message_text(
-            "*SpyTON BuyBot*\n\nTrack TON token buys directly in your group with fast setup and easy controls.\n\nNo private DM setup is needed.\nEverything is managed inside your group.\n\nAdd the bot to your group and tap */start* there to begin.",
+            "*KYRON BuyBot*\n\nTrack TON token buys directly in your group with fast setup and easy controls.\n\nNo private DM setup is needed.\nEverything is managed inside your group.\n\nAdd the bot to your group and tap */start* there to begin.",
             reply_markup=kb,
             parse_mode="Markdown",
             disable_web_page_preview=True,
@@ -2641,7 +2641,7 @@ async def send_settings(chat_id: int, context: ContextTypes.DEFAULT_TYPE, msg, e
     img_note = "set" if img_set else "not set"
 
     text = (
-        "*SpyTON BuyBot Settings*\n"
+        "*KYRON BuyBot Settings*\n"
         f"• STON.fi: *{ston}*\n"
         f"• DeDust: *{dedust}*\n"
         f"• Burst mode: *{burst}*\n"
@@ -4238,7 +4238,7 @@ async def post_buy(app: Application, chat_id: int, token: Dict[str, Any], b: Dic
             return f"{float(x):,.4f}"
         return f"{float(x):,.6f}"
 
-    # -------------------- SpyTON premium buy cards (HTML) --------------------
+    # -------------------- KYRON premium buy cards (HTML) --------------------
     def h(s: Any) -> str:
         return html.escape(str(s or ""))
 
@@ -4843,7 +4843,7 @@ async def leaderboard_loop(app: Application):
                     chat = await app.bot.get_chat(channel_id)
                     pm = getattr(chat, "pinned_message", None)
                     pm_text = (getattr(pm, "text", None) or getattr(pm, "caption", None) or "") if pm else ""
-                    needle = (LEADERBOARD_HEADER_HANDLE or "@Spytontrending").strip()
+                    needle = (LEADERBOARD_HEADER_HANDLE or "@KYRONTrending").strip()
                     if pm and needle and needle in pm_text:
                         msg_id = int(pm.message_id)
                         state[key] = msg_id
@@ -4859,7 +4859,7 @@ async def leaderboard_loop(app: Application):
 
                 log.exception("build_leaderboard_text error: %s", e)
 
-                text = "🟢 <b>%s</b>\n\nNo data yet — waiting for buys…\n\n<blockquote>To trend use @SpyTONTrndBot to book trend</blockquote>" % (LEADERBOARD_HEADER_HANDLE or "@Spytontrending")
+                text = "🟢 <b>%s</b>\n\nNo data yet — waiting for buys…\n\n<blockquote>To trend use @KYRONTrndBot to book trend</blockquote>" % (LEADERBOARD_HEADER_HANDLE or "@KYRONTrending")
 
             # 1) Edit if possible
             if msg_id:
@@ -4984,7 +4984,7 @@ def main():
     import threading
     threading.Thread(target=run_flask, daemon=True).start()
 
-    log.info("SpyTON Public BuyBot starting...")
+    log.info("KYRON Public BuyBot starting...")
     # If you accidentally deploy 2 instances, Telegram will throw Conflict (two getUpdates loops).
     # We retry instead of crashing the container.
     while True:
