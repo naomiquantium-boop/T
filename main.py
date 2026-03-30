@@ -779,12 +779,19 @@ def _msg_body_amount(msg: Any, decimals: int = 9) -> float:
     except Exception:
         return 0.0
 
-def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> List[Dict[str, Any]]:
-    """Raw TonAPI blockchain transaction fallback for Blum bonding buys.
+LAUNCHPAD_BUY_OPS = {
+    "0xa5a7cbf8",  # observed on Groypad/DTrade-style launchpad buy calls
+    "0xa5a7cbf8",
+    "a5a7cbf8",
+}
 
-    This targets the exact pattern seen on Blum bonding transactions:
-      - incoming wallet -> jetton master with attached TON
-      - outgoing JettonInternalTransfer from jetton master / wallet
+
+def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> List[Dict[str, Any]]:
+    """Raw TonAPI blockchain transaction fallback for bonding / launchpad buys.
+
+    This covers the earlier Blum-style bonding flow and Groypad-like launchpad buys
+    where the wallet sends TON into a launchpad/router contract and the user receives
+    an outgoing Jetton Transfer / Jetton Internal Transfer in the same transaction.
     """
     if not isinstance(tx, dict):
         return []
@@ -814,6 +821,12 @@ def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> Lis
 
     buyer = _msg_addr_deep((in_msg.get("source") if isinstance(in_msg, dict) else None) or (in_msg.get("src") if isinstance(in_msg, dict) else None) or in_msg)
     ton_in = _msg_value_ton(in_msg)
+    in_op = _msg_opcode(in_msg)
+    try:
+        in_blob = json.dumps((in_msg.get("decoded_body") or in_msg.get("decodedBody") or in_msg.get("body") or {}), ensure_ascii=False).lower() if isinstance(in_msg, dict) else ""
+    except Exception:
+        in_blob = ""
+    launchpad_like_in = any(x in (in_op or "") for x in LAUNCHPAD_BUY_OPS) or any(x in in_blob for x in LAUNCHPAD_BUY_OPS)
 
     candidates = []
     for m in out_msgs:
@@ -824,25 +837,29 @@ def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> Lis
         text_blob = json.dumps(body, ensure_ascii=False).lower() if isinstance(body, dict) else str(body).lower()
         src_addr = _msg_addr_deep((m.get("source") if isinstance(m, dict) else None) or (m.get("src") if isinstance(m, dict) else None) or m)
         dst_addr = _msg_addr_deep((m.get("destination") if isinstance(m, dict) else None) or (m.get("dest") if isinstance(m, dict) else None) or (m.get("dst") if isinstance(m, dict) else None) or m)
+        amt_probe = _msg_body_amount(m, token_decimals)
         looks_like_jetton_out = (
-            "178d4519" in op
+            "0xf8a7ea5" in op
+            or "178d4519" in op
+            or "jettontransfer" in op
+            or "jetton transfer" in op
             or "jettoninternaltransfer" in op
             or "jetton internal transfer" in op
             or "internal transfer" in op
+            or "0xf8a7ea5" in text_blob
             or "178d4519" in text_blob
+            or "jettontransfer" in text_blob
+            or "jetton transfer" in text_blob
             or "jettoninternaltransfer" in text_blob
             or "jetton internal transfer" in text_blob
             or "internal transfer" in text_blob
         )
         if not looks_like_jetton_out:
-            # Some Blum bonding txs are decoded without opcode text.
-            # Accept token-master sourced out messages that carry a positive jetton amount.
-            amt_probe = _msg_body_amount(m, token_decimals)
-            if not (src_addr == token_addr and amt_probe > 0):
+            # Some bonding / launchpad txs are decoded without opcode text.
+            # Accept positive jetton-like out legs if the incoming call looked like a launchpad buy.
+            if not ((src_addr == token_addr and amt_probe > 0) or (launchpad_like_in and amt_probe > 0)):
                 continue
-        else:
-            amt_probe = _msg_body_amount(m, token_decimals)
-        token_amount = amt_probe if "amt_probe" in locals() else _msg_body_amount(m, token_decimals)
+        token_amount = amt_probe or _msg_body_amount(m, token_decimals)
         if token_amount <= 0:
             continue
         response_addr = ""
@@ -947,14 +964,14 @@ I18N: Dict[str, Dict[str, str]] = {
     "lang_en": "🇬🇧 English",
     "lang_ru": "🇷🇺 Russian",
     "start_title": "🚀 *KYRON BuyBot*",
-    "start_desc": "Premium buy alerts for STON.fi + DeDust (TON).\n\n• Add to a group\n• Configure token in 10 seconds\n• Clean buy posts + ads support\n\nUse the buttons below:",
+    "start_desc": "Premium buy alerts for STON.fi + DeDust + Groypad launches (TON).\n\n• Add to a group\n• Configure token in 10 seconds\n• Clean buy posts + ads support\n\nUse the buttons below:",
     "connected_title": "✅ *KYRON BuyBot connected*",
-    "connected_desc": "Now send the token CA here in DM.\nI will auto-detect *STON.fi* / *DeDust* pools and start posting buys in your group.\n\nTip: you can also include the token Telegram link in the same message.\nExample:\n`<CA> https://t.me/YourToken`",
+    "connected_desc": "Now send the token CA here in DM.\nI will auto-detect *STON.fi* / *DeDust* pools and also watch *Groypad* launchpad flow when no pool is live yet, then start posting buys in your group.\n\nTip: you can also include the token Telegram link in the same message.\nExample:\n`<CA> https://t.me/YourToken`",
     "lang_set_ok": "Language saved: English ✅",
     "lang_set_ok_ru": "Language saved: Russian ✅",
     "need_admin": "Admins only.",
     "wiz_paste_title": "🛰 KYRON Setup — Paste Token CA",
-    "wiz_paste_hint": "STON.fi / DeDust will be auto-detected.",
+    "wiz_paste_hint": "STON.fi / DeDust / Groypad will be auto-detected.",
     "wiz_found_title": "🔎 Token found",
     "wiz_confirm": "✅ Confirm",
     "wiz_edit": "✏️ Edit",
@@ -982,14 +999,14 @@ I18N: Dict[str, Dict[str, str]] = {
     "lang_en": "🇬🇧 English",
     "lang_ru": "🇷🇺 Русский",
     "start_title": "🚀 *KYRON BuyBot*",
-    "start_desc": "Премиум-уведомления о покупках для STON.fi + DeDust (TON).\n\n• Добавьте в группу\n• Настройте токен за 10 секунд\n• Чистые buy-посты + поддержка рекламы\n\nИспользуйте кнопки ниже:",
+    "start_desc": "Премиум-уведомления о покупках для STON.fi + DeDust + запусков Groypad (TON).\n\n• Добавьте в группу\n• Настройте токен за 10 секунд\n• Чистые buy-посты + поддержка рекламы\n\nИспользуйте кнопки ниже:",
     "connected_title": "✅ *KYRON BuyBot подключён*",
-    "connected_desc": "Теперь отправьте сюда в ЛС адрес токена (CA).\nЯ автоматически найду пулы *STON.fi* / *DeDust* и начну постить покупки в вашей группе.\n\nСовет: можно добавить ссылку на Telegram токена в том же сообщении.\nПример:\n`<CA> https://t.me/YourToken`",
+    "connected_desc": "Теперь отправьте сюда в ЛС адрес токена (CA).\nЯ автоматически найду пулы *STON.fi* / *DeDust* и также буду отслеживать launchpad *Groypad*, если пул ещё не запущен, после чего начну постить покупки в вашей группе.\n\nСовет: можно добавить ссылку на Telegram токена в том же сообщении.\nПример:\n`<CA> https://t.me/YourToken`",
     "lang_set_ok": "Язык сохранён: English ✅",
     "lang_set_ok_ru": "Язык сохранён: Русский ✅",
     "need_admin": "Только для админов.",
     "wiz_paste_title": "🛰 Настройка KYRON — отправьте CA",
-    "wiz_paste_hint": "Пулы STON.fi / DeDust будут найдены автоматически.",
+    "wiz_paste_hint": "STON.fi / DeDust / Groypad будут определены автоматически.",
     "wiz_found_title": "🔎 Токен найден",
     "wiz_confirm": "✅ Подтвердить",
     "wiz_edit": "✏️ Изменить",
@@ -2621,6 +2638,7 @@ async def addtoken_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ston_pool": ston_pool,
         "dedust_pool": dedust_pool,
         "blum_mode": bool((not ston_pool) and (not dedust_pool)),
+        "launchpad": ("groypad" if (not ston_pool and not dedust_pool) else ""),
         "blum_cap_ton": float(BLUM_BONDING_CAP_TON),
         "blum_progress_ton": 0.0,
         "blum_progress_pct": 0.0,
@@ -4074,6 +4092,7 @@ async def _set_token_now(chat_id: int, jetton: str, context: ContextTypes.DEFAUL
         "ston_pool": ston_pool,
         "dedust_pool": dedust_pool,
         "blum_mode": bool((not ston_pool) and (not dedust_pool)),
+        "launchpad": ("groypad" if (not ston_pool and not dedust_pool) else ""),
         "blum_cap_ton": float(BLUM_BONDING_CAP_TON),
         "blum_progress_ton": 0.0,
         "blum_progress_pct": 0.0,
@@ -4552,7 +4571,7 @@ async def poll_once(app: Application):
                                 "buyer": b.get("buyer"),
                                 "ton": ton_amt,
                                 "token_amount": float(b.get("token_amount") or 0.0),
-                            }, source="Blum")
+                            }, source=("Groypad" if str(token.get("launchpad") or "").lower()=="groypad" else "Blum"))
                             posted_here.append(b)
                         if posted_here:
                             blum_progress_from_buys(token, posted_here)
@@ -4612,7 +4631,7 @@ async def poll_once(app: Application):
                                     "buyer": b.get("buyer"),
                                     "ton": ton_amt,
                                     "token_amount": float(b.get("token_amount") or 0.0),
-                                }, source="Blum")
+                                }, source=("Groypad" if str(token.get("launchpad") or "").lower()=="groypad" else "Blum"))
                                 posted_here.append(b)
                             if posted_here:
                                 blum_progress_from_buys(token, posted_here)
