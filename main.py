@@ -706,13 +706,17 @@ def blum_extract_buys_from_tonapi_event(ev: Dict[str, Any], token_addr: str) -> 
 
 
 def _msg_addr_deep(x: Any) -> str:
-    """Best-effort address extractor from TonAPI message-like objects."""
+    """Best-effort address extractor from TonAPI / TonCenter message-like objects."""
     if x is None:
         return ""
     if isinstance(x, str):
         return x.strip()
     if isinstance(x, dict):
-        for k in ("address", "account", "addr", "source", "destination", "src", "dst"):
+        for k in (
+            "address", "account", "account_address", "owner", "jetton_wallet", "wallet",
+            "addr", "source", "destination", "src", "dst", "sender", "recipient",
+            "from", "to", "response_address", "responseAddress",
+        ):
             v = x.get(k)
             if isinstance(v, str) and v.strip():
                 return v.strip()
@@ -720,21 +724,44 @@ def _msg_addr_deep(x: Any) -> str:
                 inner = _msg_addr_deep(v)
                 if inner:
                     return inner
+        for v in x.values():
+            if isinstance(v, dict):
+                inner = _msg_addr_deep(v)
+                if inner:
+                    return inner
     return ""
+
+def _norm_opcode_value(v: Any) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, int):
+        return hex(v).lower()
+    s = str(v).strip().lower()
+    if not s:
+        return ""
+    if s.isdigit():
+        try:
+            return hex(int(s)).lower()
+        except Exception:
+            return s
+    return s
+
 
 def _msg_opcode(msg: Any) -> str:
     if not isinstance(msg, dict):
         return ""
     for k in ("opcode", "op_code", "opCode", "decoded_op_name", "decodedOpName", "operation"):
         v = msg.get(k)
-        if isinstance(v, str) and v.strip():
-            return v.strip().lower()
+        op = _norm_opcode_value(v)
+        if op:
+            return op
     body = msg.get("decoded_body") or msg.get("decodedBody") or msg.get("body")
     if isinstance(body, dict):
         for k in ("opcode", "op_code", "opCode", "operation", "type", "@type", "name"):
             v = body.get(k)
-            if isinstance(v, str) and v.strip():
-                return v.strip().lower()
+            op = _norm_opcode_value(v)
+            if op:
+                return op
     return ""
 
 def _msg_value_ton(msg: Any) -> float:
@@ -758,17 +785,31 @@ def _msg_value_ton(msg: Any) -> float:
             continue
     return 0.0
 
+def _find_amount_deep(x: Any) -> Any:
+    if x is None:
+        return None
+    if isinstance(x, dict):
+        for k in ("amount", "jetton_amount", "token_amount", "forward_ton_amount", "coins"):
+            v = x.get(k)
+            if v is not None:
+                return v
+        for v in x.values():
+            if isinstance(v, dict):
+                found = _find_amount_deep(v)
+                if found is not None:
+                    return found
+    return None
+
+
 def _msg_body_amount(msg: Any, decimals: int = 9) -> float:
     if not isinstance(msg, dict):
         return 0.0
     raw = None
     body = msg.get("decoded_body") or msg.get("decodedBody") or msg.get("body")
     if isinstance(body, dict):
-        raw = body.get("amount")
-        if raw is None:
-            raw = body.get("jetton_amount") or body.get("token_amount")
+        raw = _find_amount_deep(body)
     if raw is None:
-        raw = msg.get("amount")
+        raw = _find_amount_deep(msg)
     s = str(raw or "").strip()
     if not s:
         return 0.0
@@ -849,6 +890,8 @@ def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> Lis
     except Exception:
         in_blob = ""
     launchpad_like_in = any(x in (in_op or "") for x in LAUNCHPAD_BUY_OPS) or any(x in in_blob for x in LAUNCHPAD_BUY_OPS)
+    if (not launchpad_like_in) and ton_in > 0 and tx_hash and ("groypad" in in_blob or "dtrade" in in_blob):
+        launchpad_like_in = True
 
     candidates = []
     for m in out_msgs:
@@ -863,6 +906,7 @@ def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> Lis
         looks_like_jetton_out = (
             "0xf8a7ea5" in op
             or "178d4519" in op
+            or "0x178d4519" in op
             or "jettontransfer" in op
             or "jetton transfer" in op
             or "jettoninternaltransfer" in op
@@ -870,6 +914,7 @@ def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> Lis
             or "internal transfer" in op
             or "0xf8a7ea5" in text_blob
             or "178d4519" in text_blob
+            or "0x178d4519" in text_blob
             or "jettontransfer" in text_blob
             or "jetton transfer" in text_blob
             or "jettoninternaltransfer" in text_blob
@@ -879,7 +924,9 @@ def blum_extract_buys_from_tonapi_tx(tx: Dict[str, Any], token_addr: str) -> Lis
         if not looks_like_jetton_out:
             # Some bonding / launchpad txs are decoded without opcode text.
             # Accept positive jetton-like out legs if the incoming call looked like a launchpad buy.
-            if not ((src_addr == token_addr and amt_probe > 0) or (launchpad_like_in and amt_probe > 0)):
+            # For Groypad / DTrade launchpad mode, a positive token-like amount on an outgoing leg
+            # in a tx that also sends TON into the watched contract is enough to count as a buy.
+            if not ((src_addr == token_addr and amt_probe > 0) or (launchpad_like_in and amt_probe > 0) or (ton_in > 0 and amt_probe > 0)):
                 continue
         token_amount = amt_probe or _msg_body_amount(m, token_decimals)
         if token_amount <= 0:
